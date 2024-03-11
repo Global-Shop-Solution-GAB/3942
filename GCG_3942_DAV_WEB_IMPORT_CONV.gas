@@ -1,0 +1,489 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Variable.Global.bProcessed.Declare(Boolean,False)
+Variable.UDT.uOrder.Define("CUSTOMER",String)
+Variable.UDT.uOrder.Define("CUSTOMER_PO",String)
+Variable.UDT.uOrder.Define("SHIP_TO_NAME",String)
+Variable.UDT.uOrder.Define("SHIP_TO_ADDRESS_1",String)
+Variable.UDT.uOrder.Define("SHIP_TO_ADDRESS_2",String)
+Variable.UDT.uOrder.Define("SHIP_TO_CITY",String)
+Variable.UDT.uOrder.Define("SHIP_TO_STATE",String)
+Variable.UDT.uOrder.Define("SHIP_TO_ZIP",String)
+Variable.UDT.uOrder.Define("QTY",Float)
+Variable.UDT.uOrder.Define("COMMENTS",String)
+Variable.UDT.uOrder.Define("USER_1",String)
+Variable.UDT.uOrder.Define("USER_2",String)
+Variable.UDT.uOrder.Define("USER_3",String)
+Variable.UDT.uOrder.Define("USER_4",String)
+Variable.UDT.uOrder.Define("USER_5",String)
+Variable.UDT.uOrder.Define("DESCRIPTION",String)
+Variable.UDT.uOrder.Define("PART",String)
+Variable.UDT.uOrder.Define("CUSTOMER_PART",String)
+Variable.UDT.uOrder.Define("TEXT_LINE_1",String)
+Variable.UDT.uOrder.Define("TEXT_LINE_2",String)
+Variable.UDT.uOrder.Define("TEXT_LINE_3",String)
+Variable.UDT.uOrder.Define("TEXT_LINE_4",String)
+Variable.UDT.uOrder.Define("TEXT_LINE_5",String)
+Variable.UDT.uOrder.Define("TEXT_LINE_6",String)
+Variable.UDT.uOrder.Define("TEXT_LINE_7",String)
+Variable.UDT.uOrder.Define("TEXT_LINE_8",String)
+Variable.UDT.uOrder.Define("TEXT_LINE_9",String)
+Variable.UDT.uOrder.Define("TEXT_LINE_10",String)
+Variable.uGlobal.uOrder.Declare("uOrder")
+Variable.Global.lCounter.Declare(Long,0)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+F.ODBC.Connection!conX.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass,72000)
+
+'Ran on task scheduler
+'Grabs .csv files in certain format and converts to web importer ORDUPL format and calls upload
+
+
+F.Intrinsic.Control.CallSub(Checkdirs)
+F.Intrinsic.Control.CallSub(Check4files)
+F.Intrinsic.Control.CallSub(Upload)
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_DAV_WEB_IMPORT_CONV.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Main.End
+
+Program.Sub.CheckDirs.Start
+F.Intrinsic.Control.SetErrorHandler("CheckDirs_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+V.Local.sRet.Declare(String)
+V.Local.i.Declare(Float)
+V.local.bStatus.Declare(Boolean)
+V.local.sFile.Declare(String)
+V.local.iRet.Declare(Float)
+
+'Make sure all directories exist
+'If any directories do not exist, string the list together and show message box ext.
+
+'TO_BE_PROCESSED Directory
+F.Intrinsic.String.Build("{0}\WEBORDERS\TO_BE_PROCESSED",V.Caller.FilesDir,V.Local.sFile)
+F.Intrinsic.File.DirExists(V.Local.sFile,V.Local.bStatus)
+F.Intrinsic.Control.If(V.Local.bStatus,=,False)
+	F.Intrinsic.String.Build("{0}{1}{2}",V.Local.sRet,V.Local.sFile,V.Ambient.NewLine,V.Local.sRet)
+F.Intrinsic.Control.EndIf
+
+'COPIES Directory
+F.Intrinsic.String.Build("{0}\WEBORDERS\COPIES",V.Caller.FilesDir,V.Local.sFile)
+F.Intrinsic.File.DirExists(V.Local.sFile,V.Local.bStatus)
+F.Intrinsic.Control.If(V.Local.bStatus,=,False)
+	F.Intrinsic.String.Build("{0}{1}{2}",V.Local.sRet,V.Local.sFile,V.Ambient.NewLine,V.Local.sRet)
+F.Intrinsic.Control.EndIf
+
+'CSV_ERRORS Directory
+F.Intrinsic.String.Build("{0}\WEBORDERS\CSV_ERRORS",V.Caller.FilesDir,V.Local.sFile)
+F.Intrinsic.File.DirExists(V.Local.sFile,V.Local.bStatus)
+F.Intrinsic.Control.If(V.Local.bStatus,=,False)
+	F.Intrinsic.String.Build("{0}{1}{2}",V.Local.sRet,V.Local.sFile,V.Ambient.NewLine,V.Local.sRet)
+F.Intrinsic.Control.EndIf
+
+'Show list of directories with error message and end
+F.Intrinsic.Control.If(V.Local.sRet.Trim,<>,"")
+	F.Intrinsic.String.Build("The Below Directories Do NOT Exist, Please Correct and Try Again:{1}{1}{0}",V.Local.sRet,V.Ambient.NewLine,V.Local.sRet)
+	F.Intrinsic.UI.MsgBoxExt("Directories Do NOT Exist",V.Local.sRet)
+	F.Intrinsic.Control.End
+
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("CheckDirs_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_DAV_WEB_IMPORT_CONV.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.CheckDirs.End
+
+Program.Sub.Check4Files.Start
+F.Intrinsic.Control.SetErrorHandler("Check4Files_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+V.Local.sFile.Declare(String)
+V.Local.sOrders.Declare(String)
+V.Local.sLine.Declare(String)
+V.Local.i.Declare(Float)
+V.Local.iUB.Declare(Long)
+V.Local.bExists.Declare(Boolean)
+V.Local.iHandle.Declare(Long)
+V.Local.sTemp$.Declare(String)
+V.Local.iLine.Declare(Long)
+V.Local.sCCC.Declare(String)
+V.Local.sComments.Declare(String)
+V.Local.sErrorFile.Declare(String)
+V.Local.i2.Declare(Long)
+V.Local.sDate.Declare(String)
+V.Local.sRec.Declare(String)
+V.Local.sSender.Declare(String)
+V.Local.sBody.Declare(String)
+V.Local.sRet.Declare(String)
+
+F.Intrinsic.String.Build("{0}\WEBORDERS\TO_BE_PROCESSED\*.csv",V.Caller.FilesDir,V.Local.sFile)
+
+Function.Intrinsic.File.GetFileList(V.Local.sFile,0,Variable.Local.sTemp$)
+F.Intrinsic.Control.If(V.Local.sTemp$.Trim,=,"")
+	'exit if no results for .csv files
+	F.Intrinsic.Control.Exitsub
+F.Intrinsic.Control.EndIf
+
+'for each .txt file in the directory continue processing
+F.Intrinsic.String.Split(V.Local.sTemp$,":",V.Local.sTemp$)
+F.Intrinsic.Control.For(V.Local.i,V.Local.sTemp$.LBound,V.Local.sTemp$.UBound,1)
+	F.Intrinsic.String.Build("{0}\WEBORDERS\TO_BE_PROCESSED\{1}",V.Caller.FilesDir,V.Local.sTemp$(v.Local.i).Trim,V.Local.sFile)
+	'File to string array
+	F.Intrinsic.File.fileToStringArray(v.Local.sFile,v.Ambient.NewLine,v.Local.sOrders)
+	'Redim before each file
+	V.uGlobal.uOrder.Redim(-1,-1)
+	'Starting at line 1 to skip header row
+	F.Intrinsic.Control.For(V.Local.iLine,1,V.Local.sOrders.UBound,1)
+		'Split Order Line Elements
+		F.Intrinsic.String.Split(V.Local.sOrders(v.Local.iLine),"~",V.Local.sLine)
+		'If order line elements do NOT = 13, then the format is NOT correct, write error log
+		F.Intrinsic.Control.If(V.Local.sLine.UBound,<>,14)
+			F.Intrinsic.String.Build("File:{0} | Line:{3}  | FORMAT INCORRECT | {1} | {2}",V.Local.sFile,V.Ambient.date,V.Ambient.Time,V.Local.iLine,V.Local.sError)
+			F.Intrinsic.String.Build("{0}{1}",V.Ambient.Date,V.Ambient.Time,V.Local.sErrorFile)
+			F.Intrinsic.String.StripCharacters(V.Local.sErrorFile,V.Local.sErrorFile)
+			F.Intrinsic.String.Build("{0}\WEBORDERS\CSV_ERRORS\{1}.txt",V.Caller.FilesDir,V.Local.sErrorFile,V.Local.sErrorFile)
+			F.Intrinsic.File.String2File(V.Local.sErrorFile,V.Local.sError)
+			'Go to Next File
+			F.Intrinsic.Control.Next(V.Local.i)
+		F.Intrinsic.Control.Else
+			'Continue if Format is correct
+			'Resize UDT
+			F.Intrinsic.Math.Add(V.uGlobal.uOrder.UBound,1,V.Local.iUB)
+			F.Intrinsic.Control.If(V.uGlobal.uOrder.UBound,=,-1)
+				V.uGlobal.uOrder.Redim(0,V.Local.iUB)
+			F.Intrinsic.Control.Else
+				V.uGlobal.uOrder.RedimPreserve(0,V.Local.iUB)
+			F.Intrinsic.Control.EndIf
+
+			'Customer -Always 0735
+			V.uGlobal.uOrder(v.Local.iUB)!CUSTOMER.Set("0735")
+			'Customer_PO
+			F.Intrinsic.String.Split(V.Local.sLine(0).Trim,"-",V.Local.sRet)
+			V.uGlobal.uOrder(v.Local.iUB)!CUSTOMER_PO.Set(V.Local.sRet(0).Trim)
+			'Ship To Name
+			V.uGlobal.uOrder(v.Local.iUB)!SHIP_TO_NAME.Set(V.Local.sLine(2).Trim)
+			'Address Line 1
+			V.uGlobal.uOrder(v.Local.iUB)!SHIP_TO_ADDRESS_1.Set(V.Local.sLine(3).Trim)
+			'Address line 2
+			V.uGlobal.uOrder(v.Local.iUB)!SHIP_TO_ADDRESS_2.Set(V.Local.sLine(4).Trim)
+			'City
+			V.uGlobal.uOrder(v.Local.iUB)!SHIP_TO_CITY.Set(V.Local.sLine(5).Trim)
+			'State
+			V.uGlobal.uOrder(v.Local.iUB)!SHIP_TO_STATE.Set(V.Local.sLine(6).Trim)
+			'Zip code
+			V.uGlobal.uOrder(v.Local.iUB)!SHIP_TO_ZIP.Set(V.Local.sLine(7).Trim)
+			'Part
+			V.uGlobal.uOrder(v.Local.iUB)!PART.Set(V.Local.sLine(9).Trim)
+			'Description Part
+			V.uGlobal.uOrder(v.Local.iUB)!DESCRIPTION.Set(V.Local.sLine(14).Trim)
+			'Quantity of order line
+			V.uGlobal.uOrder(v.Local.iUB)!QTY.Set(V.Local.sLine(10).Trim)
+			'Customer Part
+			V.uGlobal.uOrder(v.Local.iUB)!CUSTOMER_PART.Set(V.Local.sLine(11).Trim)
+
+			'Split Description 2 into User Fields, Making sure UBound of string array has
+			'enough elements for writing to all user fields before writing to them
+			F.Intrinsic.String.LimitSplit(V.Local.sLine(13).Trim,30,V.Local.sComments)
+			V.uGlobal.uOrder(v.Local.iUB)!USER_1.Set(V.Local.sComments(0))
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,1)
+				V.uGlobal.uOrder(v.Local.iUB)!USER_2.Set(V.Local.sComments(1))
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,2)
+			V.uGlobal.uOrder(v.Local.iUB)!USER_3.Set(V.Local.sComments(2))
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,3)
+			V.uGlobal.uOrder(v.Local.iUB)!USER_4.Set(V.Local.sComments(3))
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,4)
+			V.uGlobal.uOrder(v.Local.iUB)!USER_5.Set(V.Local.sComments(4))
+			F.Intrinsic.Control.EndIf
+
+			'Write Comments to Line Extra Text Fields
+			F.Intrinsic.String.LimitSplit(V.Local.sLine(12).Trim,30,V.Local.sComments)
+			V.uGlobal.uOrder(v.Local.iUB)!TEXT_LINE_1.Set(V.Local.sComments(0))
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,1)
+				V.uGlobal.uOrder(v.Local.iUB)!TEXT_LINE_2.Set(V.Local.sComments(1))
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,2)
+			V.uGlobal.uOrder(v.Local.iUB)!TEXT_LINE_3.Set(V.Local.sComments(2))
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,3)
+			V.uGlobal.uOrder(v.Local.iUB)!TEXT_LINE_4.Set(V.Local.sComments(3))
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,4)
+			V.uGlobal.uOrder(v.Local.iUB)!TEXT_LINE_5.Set(V.Local.sComments(4))
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,5)
+			V.uGlobal.uOrder(v.Local.iUB)!TEXT_LINE_6.Set(V.Local.sComments(5))
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,6)
+			V.uGlobal.uOrder(v.Local.iUB)!TEXT_LINE_7.Set(V.Local.sComments(6))
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,7)
+			V.uGlobal.uOrder(v.Local.iUB)!TEXT_LINE_8.Set(V.Local.sComments(7))
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,8)
+			V.uGlobal.uOrder(v.Local.iUB)!TEXT_LINE_9.Set(V.Local.sComments(8))
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Local.sComments.UBound,>=,9)
+			V.uGlobal.uOrder(v.Local.iUB)!TEXT_LINE_10.Set(V.Local.sComments(9))
+			F.Intrinsic.Control.EndIf
+
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Next(V.Local.iLine)
+	
+	'Write to Formatted Text File for each .csv File is a separate Order File
+	F.Intrinsic.Control.If(V.uGlobal.uOrder.UBound,<>,-1)
+		F.Intrinsic.Control.CallSub(Formatupload,"FILE",V.Local.sFile)
+	F.Intrinsic.Control.EndIf
+'go to next .csv file
+	F.Intrinsic.Math.Add(Variable.Global.lCounter, 1, Variable.Global.lCounter)
+F.Intrinsic.Control.Next(V.Local.i)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Check4Files_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_DAV_WEB_IMPORT_CONV.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Check4Files.End
+
+Program.Sub.FormatUpload.Start
+F.Intrinsic.Control.SetErrorHandler("FormatUpload_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sRet.Declare(String)
+V.Local.i.Declare(Float)
+V.local.bStatus.Declare(Boolean)
+V.local.sFile.Declare(String)
+V.local.iRet.Declare(Float)
+V.Local.sTemp.Declare(String)
+V.Local.sFileContents.Declare(String)
+V.Local.sQty.Declare(String)
+
+'Loop through UDT and format string array and then String2File
+F.Intrinsic.Control.For(V.Local.i,V.uGlobal.uOrder.LBound,V.uGlobal.uOrder.UBound,1)
+	'Transaction Type = O and Customer
+	F.Intrinsic.String.Build("{1}O{0}",V.uGlobal.uOrder(v.Local.i)!CUSTOMER,V.Local.sTemp,V.Local.sTemp)
+	'Customer PO
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",201,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!CUSTOMER_PO,V.Local.sTemp,V.Local.sTemp)
+	'Ship To Name
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",232,V.Local.sTemp)
+	F.Intrinsic.String.Build("{0}S",V.Local.sTemp,V.Local.sTemp)
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",259,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!SHIP_TO_NAME,V.Local.sTemp,V.Local.sTemp)
+	'Address 1
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",289,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!SHIP_TO_ADDRESS_1,V.Local.sTemp,V.Local.sTemp)
+	'Address 2
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",320,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!SHIP_TO_ADDRESS_2,V.Local.sTemp,V.Local.sTemp)
+	'City
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",379,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!SHIP_TO_CITY,V.Local.sTemp,V.Local.sTemp)
+	'State
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",404,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!SHIP_TO_STATE,V.Local.sTemp,V.Local.sTemp)
+	'Zip
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",406,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!SHIP_TO_ZIP,V.Local.sTemp,V.Local.sTemp)
+	'Qty
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",705,V.Local.sTemp)
+	'Format Qty
+	F.Intrinsic.String.IsInString(V.uGlobal.uOrder(v.Local.i)!QTY.String,".",True,V.Local.bStatus)
+	F.Intrinsic.Control.If(V.Local.bStatus,=,True)
+		F.Intrinsic.String.Split(V.uGlobal.uOrder(v.Local.i)!QTY.String,".",V.Local.sRet)
+		F.Intrinsic.String.LPad(V.Local.sRet(0),"0",9,V.Local.sQty)
+		F.Intrinsic.String.Build("{0}{1}",V.Local.sQty,V.Local.sRet(1),V.Local.sQty)
+		F.Intrinsic.String.RPad(V.Local.sQty,"0",13,V.Local.sQty)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.LPad(V.uGlobal.uOrder(v.Local.i)!QTY.String,"0",9,V.Local.sQty)
+		F.Intrinsic.String.RPad(V.Local.sQty,"0",13,V.Local.sQty)
+	F.Intrinsic.Control.EndIf
+	F.Intrinsic.String.Build("{1}{0}",V.Local.sQty,V.Local.sTemp,V.Local.sTemp)
+	'Part
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",730,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!PART,V.Local.sTemp,V.Local.sTemp)
+	'Description
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",818,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!DESCRIPTION,V.Local.sTemp,V.Local.sTemp)
+	'Line User 1
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",867,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!USER_1,V.Local.sTemp,V.Local.sTemp)
+	'Line User 2
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",897,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!USER_2,V.Local.sTemp,V.Local.sTemp)
+	'Line User 3
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",927,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!USER_3,V.Local.sTemp,V.Local.sTemp)
+	'Line User 4
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",957,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!USER_4,V.Local.sTemp,V.Local.sTemp)
+	'Line User 5
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",987,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!USER_5,V.Local.sTemp,V.Local.sTemp)
+	'Extra Text 1, Make sure comments exist first
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",1049,V.Local.sTemp)
+	F.Intrinsic.Control.If(V.uGlobal.uOrder(v.Local.i)!TEXT_LINE_1.Trim,<>,"")
+		F.Intrinsic.String.Build("{1}T{0}",V.uGlobal.uOrder(v.Local.i)!TEXT_LINE_1,V.Local.sTemp,V.Local.sTemp)
+	F.Intrinsic.Control.EndIf
+	'Extra Text 2
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",1080,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!TEXT_LINE_2,V.Local.sTemp,V.Local.sTemp)
+	'Extra Text 3
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",1110,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!TEXT_LINE_3,V.Local.sTemp,V.Local.sTemp)
+	'Extra Text 4
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",1140,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!TEXT_LINE_4,V.Local.sTemp,V.Local.sTemp)
+	'Extra Text 5
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",1170,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!TEXT_LINE_5,V.Local.sTemp,V.Local.sTemp)
+	'Extra Text 6
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",1200,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!TEXT_LINE_6,V.Local.sTemp,V.Local.sTemp)
+	'Extra Text 7
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",1230,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!TEXT_LINE_7,V.Local.sTemp,V.Local.sTemp)
+	'Extra Text 8
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",1260,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!TEXT_LINE_8,V.Local.sTemp,V.Local.sTemp)
+	'Extra Text 9
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",1290,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!TEXT_LINE_9,V.Local.sTemp,V.Local.sTemp)
+	'Extra Text 10
+	F.Intrinsic.String.RPad(V.Local.sTemp," ",1320,V.Local.sTemp)
+	F.Intrinsic.String.Build("{1}{0}",V.uGlobal.uOrder(v.Local.i)!TEXT_LINE_10,V.Local.sTemp,V.Local.sTemp)
+
+	F.Intrinsic.String.Build("{0}{1}{2}",V.Local.sFileContents,V.Local.sTemp,V.Ambient.NewLine,V.Local.sFileContents)
+F.Intrinsic.Control.Next(V.Local.i)
+
+'Build Unique File Name for this order
+F.Intrinsic.String.Build("{0}{1}{2}",V.Ambient.Date,V.Ambient.Time, Variable.Global.lCounter ,V.Local.sRet)
+F.Intrinsic.String.StripCharacters(V.Local.sRet,V.Local.sRet)
+
+'String to file
+F.Intrinsic.String.Build("{0}\WEBORDERS\{1}.txt",V.Caller.FilesDir,V.Local.sRet,V.Local.sFile)
+F.Intrinsic.File.String2File(V.Local.sFile,V.Local.sFileContents)
+
+'Make Copy of current file before deleting
+F.Intrinsic.File.GetFileNameFromFQN(V.Args.File,V.Local.sRet)
+F.Intrinsic.String.Build("{0}\WEBORDERS\COPIES\{1}",V.Caller.FilesDir,V.Local.sRet,V.Local.sFile)
+F.Intrinsic.File.CopyFile(V.Args.File,V.Local.sFile)
+
+'Delete file
+F.Intrinsic.File.DeleteFile(V.Args.File)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("FormatUpload_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_DAV_WEB_IMPORT_CONV.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.FormatUpload.End
+
+Program.Sub.Upload.Start
+F.Intrinsic.Control.SetErrorHandler("Upload_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sParams.Declare(String)
+
+'Call ORDUPL to upload sales orders created, it will process all txt files created by this program.
+'if ORDUPL encounters an error, it will move the file to the ERRORS folder designated in GLOBAL\FILES\GSSPARAM.txt or GSSPARAMccc.txt
+F.Intrinsic.String.Build("{0}!*!ORDUPL",V.Caller.CompanyCode,V.Local.sParams)
+F.Global.General.CallWrapperSync(51,V.Local.sParams)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Upload_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_DAV_WEB_IMPORT_CONV.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Upload.End
+
+Program.Sub.Comments.Start
+${$0$}$GCG_DAV_WEB_IMPORT_CONV$}$SFF$}$6/26/2015$}$False
+${$3$}$0$}$$}$-1$}$-1$}$$}$1/1/1900$}$Ran on task scheduler at designated time by customer.
+
+Look in File Directory TBD for all .csv files.
+
+for each .csv file loop through the lines and create an order file used for the web importer. each csv file is a new order.
+
+The file is delimited by "~" instead of comma.
+
+Use Web Importer Layout to create file. Layout attached.
+
+****LAYOUT****
+.csv Column Header = Web Importer Field
+PO Number-Item Number = Customer PO(**remove Item Number)
+
+**Item Number will be auto incremented on the imported order so Item 1 will be Line 1 of Sales order.
+
+"0735" = Customer Number (Hardcoded)
+
+Name = Shipto Name
+Address1 = Ship To Address 1
+Address2 = Ship To Address 2
+City = Ship To City
+State = Ship To State
+Zipcode = Ship To Zip
+SKU = Part Number
+Qty = Qty Order
+Vendor SKU = Customer Part #
+Comments = Data Type = "T" Text Lines(30 Char segments from position 1051-1350)
+Description 1 = (User Fields)-(30 Character Segments)
+Description 2 = Part Description(30 Characters)
+
+Save original file to a save directory "I:\GLOBAL\WEBORDERS\CONVERTED"
+**the above directory must exist prior to delivery of project
+
+Save New file to WEB ORDER DIRECTORY = I:\GLOBAL\weborders as .txt file
+
+Call Web Importer Upload. The core system will handle file after it is called.
+
+If a .csv file in the directory does not meet the import requirements, move to Directory: WEB ORDER DIRECTORY = "I:\GLOBAL\weborders\CSV ERRORS"
+
+**Above directory must exist prior to delivery of project
+Program.Sub.Comments.End
+
